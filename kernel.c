@@ -61,13 +61,22 @@ void __attribute__((section("__start"))) main(void)
 
   uint32 *buf = (uint32 *) buffer;
 
-  //inp_byte(0x40);
-  //outp_byte(0xE9, 'H');
-
-  for(int i = 0; i < v_mode->width * v_mode->height; i++)
+  const i8* buff = "Writing to Vesa Buffer";
+  int i = 0;
+  while(buff[i] != '\0')
   {
-    buf[i] = 0xFFFFFF;
+    outp_byte(0xE9, buff[i]);
+    i++;
   }
+
+  for(int i = 0; i < v_mode->width; i++)
+  {
+    for(int x = 0; x < 30; x++)
+    {
+      buf[i + (x * v_mode->width)] = 0xFF0000;
+    }
+  }
+
     //buf[i] = 0xFFFF;//make_color(18, 18, 18);
 
   //if(v_mode->width == 1200)
