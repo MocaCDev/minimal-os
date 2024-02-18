@@ -35,11 +35,6 @@ section .rodata
   F32_VID:    db 0xA, 0xE, 0xDE, 0xED ; FAT32 Volume ID (VID) "Serial" number (used for tracking volumes between computers in accordance to https://wiki.osdev.org/FAT)
   F32_VLS:    db 'EZNotes OS '        ; FAT32 Volume Label String (VLS)
   F32_SID:    db 'FAT32   '           ; FAT32 System Id String (SID)
-
-  VesaVidMode_Setup:
-    width         dw 0x640
-    height        dw 0x384
-    bpp           dw 0x110
   
 section .bss
   struc mbr_partition_table_entry
@@ -84,15 +79,17 @@ section .bss
 section .text
   global start
 
-  start:
-    cli
-    cld 
-    sti 
-
+  start: 
     xor ax, ax
     mov ds, ax
     mov es, ax
+
+    ; Set Vesa information at their according addresses
+    mov word [vesa_width], 0x640
+    mov word [vesa_height], 0x4B0
+    mov byte [vesa_bpp], 0x20
     
+    ; Set stack in accordance to the current programs memory address
     cli
     mov ss, ax
     mov sp, 0x7c00
@@ -101,6 +98,19 @@ section .text
 
     ; Set the Drive Number to be used to read sectors
     mov [F32_DN], dl
+
+    ; Configure second stage addres 
+    mov ax, second_stage_segment
+  
+    ; segment:offset follows the following formula: segment * 16 + offset 
+    imul ax, 0x10
+    add ax, second_stage_offset
+
+    ; Obtain # of sectors for second stage 
+    mov cx, word [0x7C00 + 0x1DA]
+
+    push ax ; save the value of `ax`, which is the second stage address
+    push cx ; save the value of `cx`, which is the # of sectors for the second stage
 
     ; See https://www.delorie.com/djgpp/doc/rbinter/id/12/7.html
 
@@ -113,24 +123,18 @@ section .text
     int 0x13
 
     ; If the carry flag is still set, extensions are not supported
-    jc  no_extensions_error
+    jc  .read_without_extension
 
     ; If `bx` is 0xAA55, extensions are supported. `bx` has to be 0xAA55
     cmp bx, 0xAA55
     jnz no_extensions_for_drive_error
   
-  .read:
-    ; Configure second stage addres 
-    mov ax, second_stage_segment
-  
-    ; segment:offset follows the following formula: segment * 16 + offset 
-    imul ax, 0x10
-    add ax, second_stage_offset
+  .read_with_extension:
+    mov byte [extensions_enabled], 0x1   ; true
+    pop cx ; restore the value of `cx`, which will be the # of sectors for the second stage
+    pop ax ; restore the value of `ax`, which will be the second stage address
 
-    ; Second stage has 2 sectors as described in the Second Partition Entry
-    mov cx, word [0x7C00 + 0x1DA]
-
-    mov [extended_read_DAP.ADDR], eax
+    mov [extended_read_DAP.ADDR], ax
     mov [extended_read_DAP.NOS], cx
 
     ; Get the according LBA in alliance with the program and assign it
@@ -150,14 +154,35 @@ section .text
     cmp ax, SS_CHECK_ID
     jne invalid_program_read
 
+    jmp .end 
+
+  .read_without_extension:
+    mov byte [extensions_enabled], 0x0 ; false
+
+    pop cx  ; restore the value of `cx`, which will be the # of sectors for the second stage
+    pop ax  ; restore the value of `ax`, which will be the second stage address 
+
+    xor bx, bx
+    mov es, bx
+    mov bx, ax
+
+    mov ah, 0x02
+    mov al, cl
+    mov ch, 0x00
+    mov cl, byte [0x7C00 + 0x1D6]
+    inc cl
+    mov dh, 0x00
+
+    stc
+    int 0x13
+    jc failed_to_read
+
+  .end:
     ; Jump to second stage bootloader to setup VESA video mode and obtain memory map
     jmp 0x7E0:0x0;second_stage_segment:second_stage_offset
 
     ; Hopefully, we never get here
     jmp 0xFFFF:0x0000     ; "reboot"
-
-    cli
-    hlt
 
     ; We should never get here
     jmp $
@@ -226,7 +251,12 @@ section .rodata
   ; Second stage address information
   second_stage_segment      equ 0x07E0
   second_stage_offset       equ 0x0000
+  extensions_enabled        equ 0x500
 
+  VesaVidMode_Setup:
+    vesa_width                equ 0x600   ; 2-bytes for width
+    vesa_height               equ 0x602   ; 2-bytes for height
+    vesa_bpp                  equ 0x604   ; 1-byte for bits per pixel
 
 section .rodata
   ; Error messages to plausibly print throughout the program
@@ -235,9 +265,9 @@ section .rodata
   read_sectors_error_msg:           db 'Failed to read sectors.', 0x00
   invalid_program_error_msg:        db 'Invalid program read into memory.', 0x00
 
-  ; 35 bytes of padding to locate first MBR Partition Table Entry 446 bytes into the
+  ; 9 bytes of padding to locate first MBR Partition Table Entry 446 bytes into the
   ; MBR
-  times 49 db 0x0
+  times 3 db 0x0
 
   ; MBR
   create_partition_entry 1, 0x80, 0x00, 0x0A, 0x1, 0x0, 0x1

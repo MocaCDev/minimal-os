@@ -14,10 +14,14 @@ read_disk:
   mov [extended_read_DAP.NOS], ax
 
   mov si, di
-  lodsw
+  lodsb
 
-  mov ax, 0x03
-  mov [extended_read_DAP.LBA], ax
+  mov byte [extended_read_DAP.LBA], al
+
+  ; Check to see if extensions are enabled
+  mov ah, byte [0x500]
+  cmp ah, 0x00 
+  je .no_extension
 
   mov si, extended_read_DAP
   mov ah, 0x42
@@ -25,12 +29,32 @@ read_disk:
   jc .failed
 
   ret
+.no_extension:
+  xor bx, bx
+  mov es, bx
+  mov bx, [extended_read_DAP.ADDR]
+
+  mov ah, 0x02
+  mov al, [extended_read_DAP.NOS]
+  mov ch, 0x00
+  mov cl, [extended_read_DAP.LBA]
+  inc cl
+  mov dh, 0x00
+  mov dl, 0x00
+
+  ;stc
+  int 0x13
+  jc .failed 
+
+  ret
 .failed:
-  mov ah, 0x0E
-  mov al, 't'
-  int 0x10
+  mov si, failed_to_read
+  call print_string
 
   cli
   hlt
 
   jmp $
+
+section .rodata
+  failed_to_read: db 'Failed to read sectors for program', 0x0

@@ -56,15 +56,20 @@ void __attribute__((section("__start"))) main(void)
 {
   unsigned char *f = (unsigned char *)0xB8000;
 
+  f[0] = 'D';
+
   uint32 *buf = (uint32 *) buffer;
 
   //inp_byte(0x40);
-  outp_byte(0xE9, 'H');
+  //outp_byte(0xE9, 'H');
 
   for(int i = 0; i < v_mode->width * v_mode->height; i++)
-    buf[i] = 0xFFFF;//make_color(18, 18, 18);
+  {
+    buf[i] = 0xFFFFFF;
+  }
+    //buf[i] = 0xFFFF;//make_color(18, 18, 18);
 
-  //if(v_mode->width == 640)
-  //  __asm__("jmp 0xFFFF:0x0000");
+  //if(v_mode->width == 1200)
+  //  __asm__("jmp 0xFFFF");
   while(1);
 }

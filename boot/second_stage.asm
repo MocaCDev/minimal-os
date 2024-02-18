@@ -15,12 +15,6 @@ section .text
     xor ax, ax
     mov es, ax
 
-    ; Set stack to grow downward from current programs location
-    cli
-    mov sp, 0x7E00
-    mov bp, sp 
-    sti
-
     ; Read in the kernel
     mov cx, kernel_segment
     mov ax, kernel_offset
@@ -28,9 +22,15 @@ section .text
     mov di, 0x7C00 + 0x1E6
     call read_disk
 
+    ; Reset the stack to grow downwards from the current program
+    cli
+    mov sp, 0x7E00
+    mov bp, 0x7E00
+    sti
+
     ; Clear out `ax` register, otherwise `AH = 0x4F, int 0x10` will fail
     xor ax, ax
-    
+     
     mov ah, 0x4F 
     mov di, vbe_info_block
     int 0x10
@@ -53,12 +53,9 @@ section .text
     mov fs, ax
     mov si, [video_modes_offset]
 
-    ;mov si, mode_info_block
-    ;mov [E], si
-
     ; Get the width, height and bits per pixel from the MBR
     push si   ; Save `si`, don't know what it has but we want to keep its value safe
-    mov si, 0x7C00 + 0x10B
+    mov si, 0x600;0x12B
 
     ; Obtain the width from the address
     lodsw
@@ -69,10 +66,11 @@ section .text
     mov [VID_MODE_HEIGHT], ax
 
     ; Obtain the BPP from the address
-    lodsw
-    mov [VID_MODE_BPP], ax
+    lodsb
+    mov [VID_MODE_BPP], al
     pop si    ; Restore `si` to its previous state prior to obtaining wanted width/height and bpp from MBR
-
+    
+    ; Get the Vesa video mode
     call find_mode
     jmp go_to_kernel
     
@@ -84,8 +82,6 @@ section .text
 
     cli
     hlt
-
-  E equ 0x500
 
   go_to_kernel:
     in al, 0x92
@@ -119,17 +115,18 @@ section .text
 
     mov si, no_vesa_video_mode_support
 
-    cmp ax, 0x4F
-    jne failed 
-
     mov ax, [VID_MODE_WIDTH]
-    cmp ax, [mode_info_block.width]
+    cmp ax, word [mode_info_block.width]
     jne .next
 
     mov ax, [VID_MODE_HEIGHT]
-    cmp ax, [mode_info_block.height]
+    cmp ax, word [mode_info_block.height]
     jne .next
 
+    mov al, [VID_MODE_BPP]
+    cmp al, byte [mode_info_block.bpp]
+    jne .next
+    
     mov ax, 0x4F02
     mov bx, [video_mode]
     or bx, 0x4000
@@ -169,8 +166,6 @@ section .text
 
     jmp $
 
-  loc equ 0x500
-
   use32
   init_pm:
     xor ax, ax
@@ -194,16 +189,19 @@ section .text
     mov ecx, 64
     rep movsd
 
-    mov esi, 0x8400
-    mov ax, [esi]
-    cmp ax, 0x8B
-    jne .n
+    jmp word 0x8:0x8400
 
+    ; Hopefully we never get here
+    jmp 0xFFFF:0x0000
+
+    ; We should never get here
     jmp $
-  .n: jmp 0x8:0x8400
-
 
 jmp $
+
+; Made global here for `read_disk`
+section .text
+  global print_string
 
 %include "boot/gdt.asm"
 %include "boot/util/read_disk.asm"
@@ -350,3 +348,8 @@ section .data
   video_modes_offset:     dw 0x000
   video_modes_segment:    dw 0x0000
   video_mode:             dw 0x0000
+
+; Letting linker know this is the end
+; Also here so the linker can grab any plausible code that may exist
+; within this section
+section .end
