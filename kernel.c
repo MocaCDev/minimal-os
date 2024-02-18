@@ -8,6 +8,7 @@ typedef int			int32;
 typedef unsigned long long	uint64, size_t;
 typedef long long		int64;
 
+#include <types.hpp>
 #include <io.hpp>
 
 typedef struct VesaInfoBlock

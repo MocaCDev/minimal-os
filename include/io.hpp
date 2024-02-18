@@ -1,5 +1,5 @@
-#ifndef C 
-#define C 
+#ifndef IO_H 
+#define IO_H
 #include "types.hpp"
 
 static u8 inp_byte(u16 port_number)
