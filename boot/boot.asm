@@ -55,7 +55,7 @@ section .bss
   ; %1 = Partition entry #
   ; %2 = Is bootable (0x80 = bootable, 0x0 = not bootable)
   ; %3 = Starting sector
-  ; %4 = Partition ID (0x0A = MBR, 0x0B = Second Stage, 0x0C = Kernel, 0x0D = Unused, 0x0F = Filesystem)
+  ; %4 = Partition ID (0x0A = MBR, 0x0B = Second Stage, 0x0C = Kernel, 0x0D = Unused, 0xE = Pre kernel, 0x0F = Filesystem)
   ; %5 = Ending sector
   ; %6 = LBA (should resemble %5)
   ; %7 = Total sectors that the program takes up
@@ -83,11 +83,6 @@ section .text
     xor ax, ax
     mov ds, ax
     mov es, ax
-
-    ; Set Vesa information at their according addresses
-    mov word [vesa_width], 0x640
-    mov word [vesa_height], 0x4B0
-    mov byte [vesa_bpp], 0x20
     
     ; Set stack in accordance to the current programs memory address
     cli
@@ -178,11 +173,12 @@ section .text
     jc failed_to_read
 
   .end:
-    ; Jump to second stage bootloader to setup VESA video mode and obtain memory map
-    jmp 0x7E0:0x0;second_stage_segment:second_stage_offset
+    xor ax, ax
+    mov es, ax
+    mov ds, ax
 
-    ; Hopefully, we never get here
-    jmp 0xFFFF:0x0000     ; "reboot"
+    ; Jump to second stage bootloader
+    jmp second_stage_segment:second_stage_offset
 
     ; We should never get here
     jmp $
@@ -254,9 +250,9 @@ section .rodata
   extensions_enabled        equ 0x500
 
   VesaVidMode_Setup:
-    vesa_width                equ 0x600   ; 2-bytes for width
-    vesa_height               equ 0x602   ; 2-bytes for height
-    vesa_bpp                  equ 0x604   ; 1-byte for bits per pixel
+    vesa_width                dw 0x640;equ 0x600   ; 2-bytes for width
+    vesa_height               dw 0x4B0;equ 0x602   ; 2-bytes for height
+    vesa_bpp                  db 0x20;equ 0x604   ; 1-byte for bits per pixel
 
 section .rodata
   ; Error messages to plausibly print throughout the program
@@ -267,7 +263,7 @@ section .rodata
 
   ; 9 bytes of padding to locate first MBR Partition Table Entry 446 bytes into the
   ; MBR
-  times 3 db 0x0
+  times 14 db 0x0
 
   ; MBR
   create_partition_entry 1, 0x80, 0x00, 0x0A, 0x1, 0x0, 0x1
@@ -275,11 +271,14 @@ section .rodata
   ; Second Stage (LBA = 0x1, program starts at end of first sector)
   create_partition_entry 2, 0x00, 0x01, 0x0B, 0x3, 0x1, 0x2
 
+  ; Relocate Kernel Program
+  create_partition_entry 3, 0x00, 0x03, 0x0E, 0x7, 0x3, 0x4
+
   ; Kernel (LBA = 0x3, program starts at end of third sector)
-  create_partition_entry 3, 0x00, 0x03, 0x0C, 0x4, 0x3, 0x1
+  create_partition_entry 4, 0x00, 0x07, 0x0C, 0xB, 0x7, 0x4
 
   ; Unused
-  create_partition_entry 4, 0x00, 0x00, 0x0D, 0x0, 0x0, 0x0
+  ;create_partition_entry 4, 0x00, 0x00, 0x0D, 0x0, 0x0, 0x0
 
 
 ; "Magic" number 0xAA55

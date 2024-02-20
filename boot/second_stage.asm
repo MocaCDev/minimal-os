@@ -12,21 +12,38 @@ section .text
   
   start:
     ; Get VESA video mode information
-    xor ax, ax
-    mov es, ax
+    ;xor ax, ax
+    ;mov es, ax
 
-    ; Read in the kernel
-    mov cx, kernel_segment
-    mov ax, kernel_offset
+    ;xor ax, ax
+    ;mov es, ax
+    ;mov bx, 0x2000
+
+    ;mov ah, 0x02
+    ;mov al, 0x01
+    ;mov ch, 0x00
+    ;mov cl, 0x04
+    ;mov dh, 0x00 
+    ;mov dl, 0x80
+    ;int 0x13
+    
+    ;mov si, failed_to_get_super_vga_information
+    ;jc failed
+    ;jmp 0x0:0x2000
+
+    ; Read in pre-kernel program
+    mov cx, pre_kernel_segment
+    mov ax, pre_kernel_offset
     mov si, 0x7C00 + 0x1EA
     mov di, 0x7C00 + 0x1E6
     call read_disk
 
-    ; Reset the stack to grow downwards from the current program
-    cli
-    mov sp, 0x7E00
-    mov bp, 0x7E00
-    sti
+    ; Read in the kernel
+    mov cx, kernel_segment
+    mov ax, kernel_offset
+    mov si, 0x7C00 + 0x1FA
+    mov di, 0x7C00 + 0x1F6
+    call read_disk
 
     ; Clear out `ax` register, otherwise `AH = 0x4F, int 0x10` will fail
     xor ax, ax
@@ -54,13 +71,13 @@ section .text
     mov si, [video_modes_offset]
 
     ; Get the width, height and bits per pixel from the MBR
-    push si   ; Save `si`, don't know what it has but we want to keep its value safe
-    mov si, 0x600;0x12B
+    push si   ; Save `si`, we don't want to trash the video mode data
+    mov si, 0x7C00 + 0x12F
 
     ; Obtain the width from the address
     lodsw
     mov [VID_MODE_WIDTH], ax
-
+    
     ; Obtain the height from the address
     lodsw
     mov [VID_MODE_HEIGHT], ax
@@ -82,20 +99,6 @@ section .text
 
     cli
     hlt
-
-  go_to_kernel:
-    in al, 0x92
-    or al, 0x02 
-    out 0x92, al 
-
-    cli
-    lgdt [GDT_DESC]
-
-    mov eax, cr0
-    or eax, 0x01
-    mov cr0, eax
-
-    jmp word 0x8:init_pm
 
   find_mode:
     mov dx, [fs:si]
@@ -127,16 +130,16 @@ section .text
     cmp al, byte [mode_info_block.bpp]
     jne .next
     
-    mov ax, 0x4F02
-    mov bx, [video_mode]
-    or bx, 0x4000
-    xor di, di 
-    int 0x10
+    ;mov ax, 0x4F02
+    ;mov bx, [video_mode]
+    ;or bx, 0x4000
+    ;xor di, di 
+    ;int 0x10
 
-    mov si, failed_setting_mode
+    ;mov si, failed_setting_mode
 
-    cmp ax, 0x4F
-    jne failed
+    ;cmp ax, 0x4F
+    ;jne failed
 
     ret
   
@@ -165,18 +168,26 @@ section .text
     hlt 
 
     jmp $
+  
+  go_to_kernel:
+    in al, 0x92
+    or al, 0x02 
+    out 0x92, al 
+
+    cli
+    lgdt [GDT_DESC]
+
+    mov eax, cr0
+    or al, 0x01
+    mov cr0, eax
+
+    jmp word 0x8:init_pm
 
   use32
   init_pm:
-    xor ax, ax
-
     mov ax, 0x10
-    mov es, ax
     mov ds, ax
-    mov fs, ax
-    mov gs, ax
     mov ss, ax
-
     ; This will do for now
     ; Grow the stack downward from 0x90000
     mov esp, 0x90000
@@ -189,15 +200,46 @@ section .text
     mov ecx, 64
     rep movsd
 
-    jmp word 0x8:0x8400
+    ;call main
+    jmp word 0x8:0x2000;0x8400
+    ;jmp word 0x8:0x2000;0x8:0x8400
 
     ; Hopefully we never get here
-    jmp 0xFFFF:0x0000
+    ;jmp 0xFFFF:0x0000
 
     ; We should never get here
     jmp $
+  
+  times 270 - ($ - $$) db 0x0 
+  use16
 
+  call enter_pmode
+  
 jmp $
+
+use16
+enter_pmode:
+    cli
+
+    ; 4 - set protection enable flag in CR0
+    mov eax, cr0
+    or al, 1
+    mov cr0, eax
+
+    ; 5 - far jump into protected mode
+    jmp dword 08h:.pmode
+
+.pmode:
+    ; we are now in protected mode!
+    use32
+
+    ; 6 - setup segment registers
+    mov ax, 0x10
+    mov ds, ax
+    mov ss, ax
+
+  jmp 0x8:0x20000000
+  ret
 
 ; Made global here for `read_disk`
 section .text
@@ -211,6 +253,10 @@ section .rodata
   ; Kernel address information
   kernel_segment        equ 0x0840
   kernel_offset         equ 0x0000
+  
+  ; Pre-kernel address information
+  pre_kernel_segment    equ 0x0200
+  pre_kernel_offset     equ 0x0000
 
   ; Error messages to plausibly be printed throughout the program
   done_message:                         db 'All Done', 0x00
@@ -335,7 +381,7 @@ section .bss
 	  .linear_res_mask_sie:         resb 0x01	; 60-61 byte
 	  .linear_res_field_pos:	      resb 0x01	; 61-62 byte
 	  .max_pixel_clock:	            resd 0x01	; 62-66 byte
-  	.reserved4:                   resb 190  ; times 190 db 0
+    .reserved4:                   resb 190  ; times 190 db 0
 
 section .rodata
   ; Data for video mode being looked for

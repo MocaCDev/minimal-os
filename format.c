@@ -6,31 +6,49 @@
 
 int main(int args, char *argv[])
 {
-  FILE *kernel_bin = fopen("bin/kernel.bin", "rb");
-  if(!kernel_bin)
-  {
-    fprintf(stderr, "Error opening Kernel Binary.\n");
-    exit(EXIT_FAILURE);
-  }
+    FILE *kernel_bin = fopen(argv[1], "rb");
 
-  fseek(kernel_bin, 0, SEEK_END);
-  size_t kernel_bin_size = ftell(kernel_bin);
-  fseek(kernel_bin, 0, SEEK_SET);
+    if(!kernel_bin)
+    {
+        fprintf(stderr, "Error opening `%s`\n", argv[1]);
+        exit(EXIT_FAILURE);
+    }
 
-  fclose(kernel_bin);
+    /* Obtain the size of the binary so we can then decipher how much padding is needed
+     * to make the binary a multiple of 512 bytes.
+     * */
+    fseek(kernel_bin, 0, SEEK_END);
+    size_t kernel_bin_size = ftell(kernel_bin);
+    fseek(kernel_bin, 0, SEEK_SET);
 
-  size_t pad_size = 0;
-  while((kernel_bin_size + pad_size) % 512 != 0)
-    pad_size++;
+    /* This will be a useful "warning" to let us know whether there is a plausible
+     * problem when compiling/assembling.
+     * */
+    if(kernel_bin_size <= 1)
+        fprintf(stdout, "Majority of `%s` will be padded.\n", argv[1]);
 
-  printf("%ld", pad_size);
+    fclose(kernel_bin);
 
-  char *pad = (char *)calloc(pad_size, sizeof(*pad));
-  memset((void *)pad, 0, pad_size);
+    /* Decipher the amount of bytes we need to add to make the binary file a multiple
+     * of 512 bytes.
+     * */
+    size_t pad_size = 0;
+    while((kernel_bin_size + pad_size) % 512 != 0)
+        pad_size++;
 
-  kernel_bin = fopen("bin/kernel.bin", "a");
-  fwrite((const void *)pad, pad_size, sizeof(*pad), kernel_bin);
-  fclose(kernel_bin);
+    /* Allocate bytes for padding. 
+     * `calloc` should zero-out all the memory allocated, however we will be explicit
+     * and manually set each index of `pad` to zero with `memset`.
+     * */
+    char *pad = (char *)calloc(pad_size, sizeof(*pad));
+    memset((void *)pad, 0, pad_size);
 
-  return 0;
+    /* Open the binary file in "write-append" mode (a+b) and write the padding */
+    kernel_bin = fopen(argv[1], "a+b");
+    fwrite((const void *)pad, pad_size, sizeof(*pad), kernel_bin);
+    fclose(kernel_bin);
+
+    free((void *)pad);
+
+    return 0;
 }

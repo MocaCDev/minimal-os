@@ -1,4 +1,4 @@
-#include "include/io.hpp"
+/*#include "include/io.hpp"
 typedef unsigned char		uint8;
 typedef char			int8;
 typedef unsigned short		uint16;
@@ -52,34 +52,52 @@ Vesa_Info_Block *v_mode = (Vesa_Info_Block *)0x5000;
 
 #define make_color(r,g,b) r*65536 + g*256 + b
 #define buffer v_mode->framebuffer
+*/
+//extern "C" void __attribute__((cdecl)) x86_Disk_Reset();
+//extern "C" void __attribute__((cdecl)) t();
+
+//void testing()
+//{
+//  x86_Disk_Reset();
+//}
+
+#include <util.hpp>
+#include <vesa.hpp>
+
+static u16 *buf = (u16 *)0xB8000;
+static u16 y = 0;
+static u16 x = 0;
+
+void print(u8 *value)
+{
+    u32 i = 0;
+    while(value[i])
+    {
+        buf[x  + (y * 80)] = (0x0F << 8) | (0xFF & value[i]);
+        i++;
+        x++;
+    }
+}
 
 void __attribute__((section("__start"))) main(void)
 {
-  unsigned char *f = (unsigned char *)0xB8000;
+    print((u8 *)"hi");
+    //u8 *d = (u8 *)0x100;
+    //const char b[5] = "WOWW";
+    //for(int i = 0; i < 5; i++)
+    //    d[i] = b[i];
+    //tryy2(0x5, d);
 
-  f[0] = 'D';
+    //util::t();
+  
+    //unsigned short *b = (unsigned short *)(0x7C00 + 0x12F);
 
-  uint32 *buf = (uint32 *) buffer;
+    //if(b[0] == 0x640
+    //  d[0] = 'N';
+  
+    vesa::VSetup vstp(0x640, 0x4B0, 0x20);
 
-  const i8* buff = "Writing to Vesa Buffer";
-  int i = 0;
-  while(buff[i] != '\0')
-  {
-    outp_byte(0xE9, buff[i]);
-    i++;
-  }
+    vstp.attempt_obtain_mode();
 
-  for(int i = 0; i < v_mode->width; i++)
-  {
-    for(int x = 0; x < 30; x++)
-    {
-      buf[i + (x * v_mode->width)] = 0xFF0000;
-    }
-  }
-
-    //buf[i] = 0xFFFF;//make_color(18, 18, 18);
-
-  //if(v_mode->width == 1200)
-  //  __asm__("jmp 0xFFFF");
-  while(1);
+    while(1);
 }

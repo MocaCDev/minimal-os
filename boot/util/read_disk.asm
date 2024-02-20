@@ -40,7 +40,6 @@ read_disk:
   mov cl, [extended_read_DAP.LBA]
   inc cl
   mov dh, 0x00
-  mov dl, 0x00
 
   ;stc
   int 0x13

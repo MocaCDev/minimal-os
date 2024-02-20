@@ -28,6 +28,7 @@ SECTIONS
 
   .end : AT(0x81FF)
   {
+    *(.end);
     BYTE(0x0);
   }
 }
