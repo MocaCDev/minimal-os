@@ -11,25 +11,6 @@ section .text
   global start
   
   start:
-    ; Get VESA video mode information
-    ;xor ax, ax
-    ;mov es, ax
-
-    ;xor ax, ax
-    ;mov es, ax
-    ;mov bx, 0x2000
-
-    ;mov ah, 0x02
-    ;mov al, 0x01
-    ;mov ch, 0x00
-    ;mov cl, 0x04
-    ;mov dh, 0x00 
-    ;mov dl, 0x80
-    ;int 0x13
-    
-    ;mov si, failed_to_get_super_vga_information
-    ;jc failed
-    ;jmp 0x0:0x2000
 
     ; Read in pre-kernel program
     mov cx, pre_kernel_segment
@@ -213,6 +194,10 @@ section .text
   times 270 - ($ - $$) db 0x0 
   use16
 
+  mov ah, 0x00
+  mov al, 0x03
+  int 0x10
+  
   call enter_pmode
   
 jmp $

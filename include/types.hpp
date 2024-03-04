@@ -50,31 +50,22 @@ typedef signed long long *  p_lls32;
 class c_char 
 {
 private:
-    i8    *data;
-    u32   index;
-    u32   data_length = 0x1;
+    i8          *data;
+    u32         index;
+    u32         data_length;
 
 public:
-    /*c_char(const i8 *string)
+    c_char(const i8 *string)
+        : index(0), data_length(0)
     {
-        data = (i8 *)0x100;
-        u32 i = 0;
-        while(true)
+        while(string[data_length])
         {
-            if(string[i] == 0x0) break;
-
-            data[i] = string[i];
-            i++;
+            data[data_length] = string[data_length];
+            data_length++;
+            
+            if(!string[data_length])
+                data[data_length + 1] = '\0';
         }
-    }*/
-
-    c_char(u32 dl)
-        : data_length(dl)
-    {
-        data = (i8 *)0x100;
-
-        for(int i = 0; i < data_length; i++)
-            data[i] = 0x0;
     }
 
     explicit c_char() = default;
@@ -87,25 +78,17 @@ public:
     void operator++() { index++; }
     c_char& operator=(const i8 *string)
     {
-        if(this->data_length == 0)
+        data_length = 0;
+
+        while(string[data_length])
         {
-            u32 index = 0;
-            while(true)
-            {
-                if(string[index] == 0x0) break;
+            data[data_length] = string[data_length];
+            data_length++;
 
-                data[index] = string[index];
-                index++;
-            }
-
-            data[index] = 0x0;
-
-            return *this;
+            if(!string[data_length])
+                data[data_length + 1] = '\0';
         }
 
-        for(int i = 0; i < data_length; i++)
-            data[i] = string[i];
-        
         return *this;
     }
 

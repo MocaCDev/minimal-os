@@ -1,7 +1,6 @@
 #ifndef VESA_HPP
 #define VESA_HPP
-#include <util.hpp>
-#include <types.hpp>
+#include "util.hpp"
 
 /* Address where we want `struct vbe_info_block` to be stored. */
 #define VBE_INFO_BLOCK_ADDR   (u16)0x800
@@ -63,10 +62,51 @@ namespace vesa
 	    u8		reserved2[206];
     } __attribute__((packed)) Vesa_Info_Block;
 
+    /* Attempt to obtain video mode information based on the structure `vesa_setup`. */
     extern "C" u16 __attribute__((cdecl)) check_for_mode(struct vesa_setup, u16);
-    extern "C" void __attribute__((cdecl)) tryy2(u16, u8 *);
-    extern "C" u16 __attribute__((cdecl)) tryy(u16);
-    static u8 *t = (u8 *)0xB8000;
+
+    /* Print string length/string data using BIOS. */
+    extern "C" void __attribute__((cdecl)) bit16_print_string_info(u16, u8 *);
+
+    /* Expects a 16-bit value that refers to the vesa video mode # */
+    extern "C" u16 __attribute__((cdecl)) set_vesa_mode(u16);
+
+    /* TODO: Remove. Vesa will be used, thus leading to the below variable to 
+     * be useless.
+     * */
+    static u16 *t = (u16 *)0xB8000;
+    static u16 y = 0;
+    static u16 x = 0;
+
+    template<typename T>
+        requires is_cchar<T>
+    void print(T value)
+    {
+        u32 i = 0;
+
+        /* Obtain string data. */ 
+        i8 *str = value.get();
+
+        /* Print it out. */ 
+        while(str[i])
+        {
+            if(str[i] == '\n')
+            {
+                x = 0;
+                y++;
+                i++;
+                continue;
+            }
+
+            t[x + (y * 80)] = (0x0F << 0x08) | (0xFF & str[i]);
+    
+            x++;
+            i++; 
+
+            if(str[i + 1] == '\0')
+                break;
+        }
+    }
 
     class VSetup
     {
@@ -82,7 +122,7 @@ namespace vesa
     
     private:
         /* `struct vbe_info_block` explicit information (what we expect) */
-        cchar vesa_sig = (u32)5;
+        cchar vesa_sig = "VESA";
     
     public:
         explicit VSetup(u16 width, u16 height, u8 bpp)
@@ -99,7 +139,14 @@ namespace vesa
             display_mode = check_for_mode(vsetup, VBE_INFO_BLOCK_ADDR);
             
             vbei = (struct vbe_info_block *)VBE_INFO_BLOCK_ADDR;
-                
+            cchar is_good = "good!";
+            cchar is_bad = "bad!";
+            cchar val = "dude";//(const i8 *)vbei->signature;
+
+            if(util::strcmp<u8 *, cchar>(vbei->signature, vesa_sig) == true)
+                print(is_good);
+            else
+             print(is_bad);
         }
 
         ~VSetup() = default;

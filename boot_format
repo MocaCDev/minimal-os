@@ -52,29 +52,29 @@ section .bss
     .total_sectors        resd 0x01
   endstruc
 
-  ; %1 = Partition entry #
-  ; %2 = Is bootable (0x80 = bootable, 0x0 = not bootable)
-  ; %3 = Starting sector
-  ; %4 = Partition ID (0x0A = MBR, 0x0B = Second Stage, 0x0C = Kernel, 0x0D = Unused, 0xE = Pre kernel, 0x0F = Filesystem)
-  ; %5 = Ending sector
-  ; %6 = LBA (should resemble %5)
-  ; %7 = Total sectors that the program takes up
-  %macro create_partition_entry       7
-    mbr_partition_table_entry%+%1:
+  ; %%1 = Partition entry #
+  ; %%2 = Is bootable (0x80 = bootable, 0x0 = not bootable)
+  ; %%3 = Starting sector
+  ; %%4 = Partition ID (0x0A = MBR, 0x0B = Second Stage, 0x0C = Kernel, 0x0D = Unused, 0xE = Pre kernel, 0x0F = Filesystem)
+  ; %%5 = Ending sector
+  ; %%6 = LBA (should resemble %%5)
+  ; %%7 = Total sectors that the program takes up
+  %%macro create_partition_entry       7
+    mbr_partition_table_entry%%+%%1:
       istruc mbr_partition_table_entry
-        at mbr_partition_table_entry.is_bootable,     db %2
+        at mbr_partition_table_entry.is_bootable,     db %%2
         at mbr_partition_table_entry.starting_head,   db 0x0
-        at mbr_partition_table_entry.starting_sector, dw %3
-        at mbr_partition_table_entry.ID,              db %4
+        at mbr_partition_table_entry.starting_sector, dw %%3
+        at mbr_partition_table_entry.ID,              db %%4
         at mbr_partition_table_entry.ending_head,     db 0x0
-        at mbr_partition_table_entry.ending_sector,   dw %5
-        at mbr_partition_table_entry.LBA,             dd %6
-        at mbr_partition_table_entry.total_sectors,   dd %7
+        at mbr_partition_table_entry.ending_sector,   dw %%5
+        at mbr_partition_table_entry.LBA,             dd %%6
+        at mbr_partition_table_entry.total_sectors,   dd %%7
       iend
-  %endmacro
+  %%endmacro
   
 ; Second stage check ID (to make sure we read in the right program)
-%define SS_CHECK_ID     0xEBED
+%%define SS_CHECK_ID     0xEBED
 
 section .text
   global start
@@ -194,7 +194,7 @@ section .text
 
 jmp $
 
-%include "boot/util/ER_DAP.asm"
+%%include "boot/util/ER_DAP.asm"
 
 section .text
   ; int 0x13 extensions not supported
@@ -272,10 +272,10 @@ section .rodata
   create_partition_entry 2, 0x00, 0x01, 0x0B, 0x3, 0x1, 0x2
 
   ; Relocate Kernel Program
-  create_partition_entry 3, 0x00, 0x03, 0x0E, 0x7, 0x3, 0x4
+  create_partition_entry 3, 0x00, 0x03, 0x0E, 0x%X, 0x3, 0x%X
 
   ; Kernel (LBA = 0x3, program starts at end of third sector)
-  create_partition_entry 4, 0x00, 0x7, 0x0C, 0xD, 0x7, 0x6
+  create_partition_entry 4, 0x00, 0x%X, 0x0C, 0xD, 0x%X, 0x%X
 
   ; Unused
   ;create_partition_entry 4, 0x00, 0x00, 0x0D, 0x0, 0x0, 0x0
@@ -283,4 +283,3 @@ section .rodata
 
 ; "Magic" number 0xAA55
 section .magic
-¡'

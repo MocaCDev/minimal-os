@@ -2,7 +2,7 @@
 plugin_ctrl: unmapped=1, biosdev=1, speaker=1, extfpuirq=1, parallel=1, serial=1
 config_interface: textconfig
 display_library: x
-memory: host=32, guest=32
+memory: host=2048, guest=128
 romimage: file="/usr/local/share/bochs/BIOS-bochs-latest", address=0xfffe0000
 vgaromimage: file="/usr/local/share/bochs/VGABIOS-lgpl-latest"
 boot: floppy
